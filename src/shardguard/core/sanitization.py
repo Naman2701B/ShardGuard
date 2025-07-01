@@ -31,6 +31,7 @@ class InputSanitizer:
             (r"<script[^>]*>.*?</script>", "Script tags"),
             (r"javascript:", "JavaScript URLs"),
             (r"data:text/html", "HTML data URLs"),
+            (r"(<.*?)(on\w+\s*=\s*['\"][^'\"]+['\"])", "Event handlers (e.g., onmouseover, onclick, etc.)"),
         ]
 
     def sanitize(
