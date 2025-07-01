@@ -54,7 +54,7 @@ practical yet effective path to safe LLM-driven automation.
 shardguard plan "Create a secure web application with password secret123"
 
 # Using Ollama (requires ollama serve)
-shardguard plan --ollama --model llama3.2:latest "Your prompt here"
+shardguard plan --model llama3.2:latest "Your prompt here"
 ```
 
 ## Development
