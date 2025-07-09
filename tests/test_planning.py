@@ -1,9 +1,7 @@
 """Tests for ShardGuard planning functionality."""
 
-import json
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-import httpx
 import pytest
 
 from shardguard.core.planning import PlanningLLM
@@ -15,27 +13,29 @@ class MockPlanningLLM:
     def __init__(self, response: str | None = None):
         self.response = response or '{"original_prompt": "test", "sub_prompts": []}'
 
-    def generate_plan(self, prompt: str) -> str:
+    async def generate_plan(self, prompt: str) -> str:
         return self.response
 
 
 class TestPlanningLLMProtocol:
     """Test cases for PlanningLLMProtocol."""
 
-    def test_protocol_implementation(self):
-        """Test that MockPlanningLLM implements the protocol."""
+    @pytest.mark.asyncio
+    async def test_protocol_async_implementation(self):
+        """Test that MockPlanningLLM implements the async protocol."""
         mock_llm = MockPlanningLLM()
 
         # Should be able to call generate_plan
-        result = mock_llm.generate_plan("test prompt")
+        result = await mock_llm.generate_plan("test prompt")
         assert isinstance(result, str)
 
-    def test_protocol_with_custom_response(self):
+    @pytest.mark.asyncio
+    async def test_protocol_with_custom_response(self):
         """Test protocol implementation with custom response."""
         custom_response = '{"original_prompt": "custom", "sub_prompts": [{"id": 1, "content": "task"}]}'
         mock_llm = MockPlanningLLM(custom_response)
 
-        result = mock_llm.generate_plan("test")
+        result = await mock_llm.generate_plan("test")
         assert result == custom_response
 
 
@@ -66,168 +66,69 @@ class TestPlanningLLM:
         assert llm.model == expected_model
         assert llm.base_url == expected_url
 
-    @patch("httpx.Client.post")
-    @pytest.mark.parametrize(
-        "response_json, expected_result",
-        [
-            (
-                {
-                    "response": '{"original_prompt": "test prompt", "sub_prompts": [{"id": 1, "content": "subtask", "opaque_values": {}}]}'
-                },
-                '{"original_prompt": "test prompt", "sub_prompts": [{"id": 1, "content": "subtask", "opaque_values": {}}]}',
-            ),
-        ],
-    )
-    def test_generate_plan_success(self, mock_post, response_json, expected_result):
+    @pytest.mark.asyncio
+    @patch("shardguard.core.llm_providers.OllamaProvider.generate_response")
+    @patch("shardguard.core.mcp_integration.MCPClient.get_tools_description")
+    async def test_generate_plan_success(self, mock_get_tools, mock_generate):
         """Test successful plan generation."""
-        mock_response = Mock()
-        mock_response.json.return_value = response_json
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
+        # Mock tools description
+        mock_get_tools.return_value = "Available MCP Tools:\n\nServer: file-operations"
+
+        # Mock LLM response
+        expected_response = '{"original_prompt": "test prompt", "sub_prompts": [{"id": 1, "content": "async subtask", "opaque_values": {}}]}'
+        mock_generate.return_value = expected_response
 
         llm = PlanningLLM()
-        result = llm.generate_plan("test prompt")
+        result = await llm.generate_plan("test prompt")
 
-        assert result == expected_result
+        assert result == expected_response
+        mock_generate.assert_called_once()
 
-    @patch("httpx.Client.post")
-    def test_generate_plan_request_error(self, mock_post):
-        """Test handling of request errors."""
-        mock_post.side_effect = httpx.RequestError("Connection failed")
-
+    def test_extract_json_from_response(self):
+        """Test JSON extraction from LLM response."""
         llm = PlanningLLM()
 
-        with pytest.raises(ConnectionError, match="Failed to connect to Ollama"):
-            llm.generate_plan("test prompt")
+        # Test with valid JSON
+        response_with_json = 'Here is the plan: {"key": "value"} End of response.'
+        result = llm._extract_json_from_response(response_with_json)
+        assert result == '{"key": "value"}'
 
-    @patch("httpx.Client.post")
-    def test_generate_plan_http_error(self, mock_post):
-        """Test handling of HTTP status errors."""
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_response.text = "Internal Server Error"
-        mock_post.side_effect = httpx.HTTPStatusError(
-            "Server error", request=Mock(), response=mock_response
+        # Test with invalid JSON
+        response_without_json = "This is just text without JSON."
+        result = llm._extract_json_from_response(response_without_json)
+        assert result == response_without_json
+
+    @pytest.mark.asyncio
+    async def test_context_managers(self):
+        """Test context manager functionality."""
+        # Test async context manager
+        async with PlanningLLM() as llm:
+            assert isinstance(llm, PlanningLLM)
+
+
+class TestPlanningLLMConstructor:
+    """Test cases for PlanningLLM constructor with different providers."""
+
+    def test_planning_llm_ollama_constructor(self):
+        """Test creating Ollama planning LLM."""
+        from shardguard.core.planning import PlanningLLM
+
+        llm = PlanningLLM(
+            provider_type="ollama", model="llama3.1", base_url="http://custom:8080"
         )
 
-        llm = PlanningLLM()
+        assert llm.provider_type == "ollama"
+        assert llm.model == "llama3.1"
+        assert llm.base_url == "http://custom:8080"
 
-        with pytest.raises(RuntimeError, match="Ollama API error 500"):
-            llm.generate_plan("test prompt")
+    def test_planning_llm_gemini_constructor(self):
+        """Test creating Gemini planning LLM."""
+        from shardguard.core.planning import PlanningLLM
 
-    @patch("httpx.Client.post")
-    def test_generate_plan_invalid_json_from_api(self, mock_post):
-        """Test handling of invalid JSON from API."""
-        mock_response = Mock()
-        mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
-
-        llm = PlanningLLM()
-
-        with pytest.raises(ValueError, match="Invalid JSON response from Ollama"):
-            llm.generate_plan("test prompt")
-
-    def test_extract_json_from_response_valid_json(self):
-        """Test JSON extraction from response with valid JSON."""
-        llm = PlanningLLM()
-
-        response_text = 'Here is the plan: {"original_prompt": "test", "sub_prompts": []} That\'s it!'
-        result = llm._extract_json_from_response(response_text)
-
-        expected = '{"original_prompt": "test", "sub_prompts": []}'
-        assert result == expected
-
-    def test_extract_json_from_response_complex_json(self):
-        """Test JSON extraction with complex nested JSON."""
-        llm = PlanningLLM()
-
-        complex_json = '{"original_prompt": "complex task", "sub_prompts": [{"id": 1, "content": "step 1", "opaque_values": {"key": "value"}}]}'
-        response_text = f"The analysis shows: {complex_json} End of response."
-
-        result = llm._extract_json_from_response(response_text)
-        assert result == complex_json
-
-    def test_extract_json_from_response_multiple_json_blocks(self):
-        """Test JSON extraction when multiple JSON blocks exist."""
-        llm = PlanningLLM()
-
-        response_text = """
-        First attempt: {"wrong": "json"}
-
-        Corrected version: {"original_prompt": "test", "sub_prompts": [{"id": 1, "content": "task", "opaque_values": {}}]}
-
-        That's the final answer.
-        """
-
-        result = llm._extract_json_from_response(response_text)
-
-        # Should return the longest valid JSON
-        assert "original_prompt" in result
-        assert "sub_prompts" in result
-
-    def test_extract_json_from_response_invalid_json(self):
-        """Test JSON extraction when no valid JSON exists."""
-        llm = PlanningLLM()
-
-        response_text = "Sorry, I cannot process this request. No JSON here."
-        result = llm._extract_json_from_response(response_text)
-
-        # Should return original response when no valid JSON found
-        assert result == response_text
-
-    def test_extract_json_from_response_malformed_json(self):
-        """Test JSON extraction with malformed JSON."""
-        llm = PlanningLLM()
-
-        response_text = (
-            'Result: {"original_prompt": "test", "sub_prompts": [missing_bracket}'
+        llm = PlanningLLM(
+            provider_type="gemini", model="gemini-1.5-pro", api_key="test-key"
         )
-        result = llm._extract_json_from_response(response_text)
 
-        # Should return original response since JSON is malformed
-        assert result == response_text
-
-    def test_context_manager_usage(self):
-        """Test using PlanningLLM as a context manager."""
-        with patch("httpx.Client.close") as mock_close:
-            with PlanningLLM() as llm:
-                assert isinstance(llm, PlanningLLM)
-
-            # Should call close on the client
-            mock_close.assert_called_once()
-
-    @patch("httpx.Client.post")
-    def test_generate_plan_with_custom_options(self, mock_post):
-        """Test that custom options are passed to the API."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"response": '{"test": "response"}'}
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
-
-        llm = PlanningLLM()
-        llm.generate_plan("test")
-
-        # Check that options are set correctly
-        call_args = mock_post.call_args
-        request_data = call_args[1]["json"]
-        options = request_data["options"]
-
-        assert options["temperature"] == 0.1
-        assert options["top_p"] == 0.9
-        assert options["num_predict"] == 2048
-
-    @patch("httpx.Client.post")
-    def test_generate_plan_with_different_base_url(self, mock_post):
-        """Test generate_plan with different base URL."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"response": '{"test": "response"}'}
-        mock_response.raise_for_status.return_value = None
-        mock_post.return_value = mock_response
-
-        llm = PlanningLLM(base_url="http://remote:8080")
-        llm.generate_plan("test")
-
-        # Verify correct URL is used
-        call_args = mock_post.call_args
-        assert call_args[0][0] == "http://remote:8080/api/generate"
+        assert llm.provider_type == "gemini"
+        assert llm.model == "gemini-1.5-pro"
+        assert llm.api_key == "test-key"

@@ -15,8 +15,9 @@ practical yet effective path to safe LLM-driven automation.
 ## Features
 
 - **Input Sanitization**: Automatically sanitizes user input with rich CLI logging
-- **LLM Integration**: Supports local Ollama and mock LLM for development that can be extended
+- **Multi-Provider LLM Integration**: Supports both local Ollama and remote LLM providers (Google Gemini)
 - **Sensitive Data Masking**: Automatically identifies and masks sensitive information with reference placeholders
+- **Flexible Model Support**: Works with various models including llama3.2, gemini-2.0-flash-exp, and more
 
 ## Quick Start
 
@@ -24,7 +25,7 @@ practical yet effective path to safe LLM-driven automation.
 
 - Python 3.13+
 - Poetry (for dependency management)
-- Ollama
+- Ollama (for local models) OR Google AI API key (for Gemini models)
 
 ### Installation
 
@@ -49,13 +50,74 @@ practical yet effective path to safe LLM-driven automation.
 
 ### Basic Usage
 
-```bash
-# Using mock LLM (development)
-shardguard plan "Create a secure web application with password secret123"
+#### Using Ollama (Local Models)
 
-# Using Ollama (requires ollama serve)
-shardguard plan --model llama3.2:latest "Your prompt here"
+1. **Start Ollama**:
+
+   ```bash
+   ollama serve
+   ```
+
+2. **Pull a model**:
+
+   ```bash
+   ollama pull llama3.2
+   ```
+
+3. **Run ShardGuard**:
+
+   ```bash
+   poetry run shardguard plan "Send an email to john@example.com about the meeting"
+   ```
+
+#### Using Google Gemini (Remote Models)
+
+1. **Get a Gemini API key**:
+
+   - Visit [Google AI Studio](https://aistudio.google.com/)
+   - Create an API key
+
+2. **Set your API key**:
+
+   ```bash
+   # Option 1: Create a .env file (recommended)
+   cp .env.example .env
+   # Edit .env and add your API key: GEMINI_API_KEY=your-api-key-here
+
+   # Option 2: Set environment variable
+   export GEMINI_API_KEY="your-api-key-here"
+   ```
+
+3. **Run ShardGuard with Gemini**:
+
+   ```bash
+   poetry run shardguard plan "Send an email to john@example.com about the meeting" --provider gemini --model gemini-2.0-flash-exp
+   ```
+
+#### Advanced Usage
+
+```bash
+# List available MCP tools with Ollama
+shardguard list-tools --provider ollama --model llama3.2
+
+# List available MCP tools with Gemini
+shardguard list-tools --provider gemini --model gemini-2.0-flash-exp
+
+# Use custom Ollama URL
+shardguard plan "Your prompt" --provider ollama --ollama-url http://localhost:11434
+
+# Pass Gemini API key directly (not recommended for security)
+shardguard plan "Your prompt" --provider gemini --gemini-api-key "your-key"
 ```
+
+## Configuration
+
+### Available Models
+
+| Provider   | Models                                                                     | Notes                    |
+| ---------- | -------------------------------------------------------------------------- | ------------------------ |
+| **Gemini** | `gemini-2.0-flash-exp` (default)<br>`gemini-1.5-pro`<br>`gemini-1.5-flash` | Remote, requires API key |
+| **Ollama** | `llama3.2` (default)<br>`llama3.1`<br>`codellama`<br>`mistral`             | Local, free              |
 
 ## Development
 
@@ -83,11 +145,13 @@ poetry run ruff format .
 
 ```text
 src/shardguard/
-├── cli.py              # CLI interface
+├── cli.py              # CLI interface with multi-provider support
 ├── core/
 │   ├── coordination.py # Main service
+│   ├── llm_providers.py # LLM provider implementations (Ollama, Gemini)
+│   ├── mcp_integration.py # MCP integration with provider support
 │   ├── models.py       # Data models
-│   ├── planning.py     # LLM implementations
+│   ├── planning.py     # Planning LLM implementations
 │   └── prompts.py      # Prompt templates
 └── utils/
     └── logging.py      # Logging utilities

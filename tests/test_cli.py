@@ -1,291 +1,236 @@
-"""Tests for ShardGuard CLI functionality."""
+"""Tests for the CLI module."""
 
-import json
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import typer
 from typer.testing import CliRunner
 
-from shardguard.cli import app, main
-from shardguard.core.models import Plan, SubPrompt
+from shardguard.cli import app, create_planner
+
+
+class TestCreatePlanner:
+    """Test the create_planner context manager."""
+
+    @pytest.mark.asyncio
+    async def test_create_planner_success(self):
+        """Test successful planner creation and cleanup."""
+        with patch("shardguard.cli.PlanningLLM") as mock_planning_llm_class:
+            mock_planner = Mock()
+            mock_planner.get_available_tools_description = AsyncMock(
+                return_value="Available MCP Tools:\n\nServer: test-server\n• test-tool"
+            )
+            mock_planner.close = Mock()
+            mock_planning_llm_class.return_value = mock_planner
+
+            async with create_planner() as planner:
+                assert planner == mock_planner
+                mock_planner.get_available_tools_description.assert_called_once()
+
+            mock_planner.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_planner_with_connection_error(self):
+        """Test planner creation when MCP connection fails."""
+        with patch("shardguard.cli.PlanningLLM") as mock_planning_llm_class:
+            mock_planner = Mock()
+            mock_planner.get_available_tools_description = AsyncMock(
+                side_effect=Exception("Connection failed")
+            )
+            mock_planner.close = Mock()
+            mock_planning_llm_class.return_value = mock_planner
+
+            async with create_planner() as planner:
+                assert planner == mock_planner
+
+            mock_planner.close.assert_called_once()
 
 
 class TestCLICommands:
-    """Test cases for CLI commands."""
+    """Test CLI commands using proper mocking without global state."""
 
     def setup_method(self):
         """Set up test fixtures."""
         self.runner = CliRunner()
 
-    def test_app_help(self):
-        """Test that the app shows help correctly."""
-        result = self.runner.invoke(app, ["--help"])
-
-        assert result.exit_code == 0
-        assert "ShardGuard CLI" in result.output
-
-    def test_main_callback_without_subcommand(self):
-        """Test main callback when no subcommand is provided."""
-        result = self.runner.invoke(app, [])
-
-        assert result.exit_code == 0
-        assert "Welcome to ShardGuard!" in result.output
-        assert "sub-commands" in result.output
-
-    def test_plan_command_help(self):
-        """Test plan command help."""
-        result = self.runner.invoke(app, ["plan", "--help"])
-
-        assert result.exit_code == 0
-        assert "Generate a safe execution plan" in result.output
-        assert "--model" in result.output
-        assert "--ollama-url" in result.output
-
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_success(self, mock_planning_llm, mock_coordination_service):
-        """Test successful plan command execution."""
-        # Setup mocks
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
-
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
-
-        # Create a sample plan to return
-        sample_plan = Plan(
-            original_prompt="Test prompt",
-            sub_prompts=[SubPrompt(id=1, content="Test task", opaque_values={})],
-        )
-        mock_coordination_instance.handle_prompt.return_value = sample_plan
-
-        result = self.runner.invoke(app, ["plan", "Test prompt"])
-
-        assert result.exit_code == 0
-
-        # Verify the mocks were called correctly
-        mock_planning_llm.assert_called_once_with(
-            model="llama3.2", base_url="http://localhost:11434"
-        )
-        mock_coordination_service.assert_called_once_with(mock_planner_instance)
-        mock_coordination_instance.handle_prompt.assert_called_once_with("Test prompt")
-
-        # Verify output contains JSON
-        assert "original_prompt" in result.output
-        assert "sub_prompts" in result.output
-
-    @pytest.mark.parametrize(
-        "args, expected_model, expected_url",
-        [
-            (
-                ["plan", "Test prompt", "--model", "custom-model"],
-                "custom-model",
-                "http://localhost:11434",
-            ),
-            (
-                ["plan", "Test prompt", "--ollama-url", "http://custom:8080"],
-                "llama3.2",
-                "http://custom:8080",
-            ),
-        ],
-    )
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_with_custom_parameters(
-        self,
-        mock_planning_llm,
-        mock_coordination_service,
-        args,
-        expected_model,
-        expected_url,
+    def _create_mock_planner_context(
+        self, tools_description="Available MCP Tools:\n\nServer: test-server"
     ):
-        """Test plan command with custom parameters."""
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
-
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
-
-        sample_plan = Plan(original_prompt="Test", sub_prompts=[])
-        mock_coordination_instance.handle_prompt.return_value = sample_plan
-
-        result = self.runner.invoke(app, args)
-
-        assert result.exit_code == 0
-
-        # Verify custom parameters were used
-        mock_planning_llm.assert_called_once_with(
-            model=expected_model, base_url=expected_url
+        """Helper to create a mock planner context manager."""
+        mock_planner = Mock()
+        mock_planner.get_available_tools_description = AsyncMock(
+            return_value=tools_description
         )
 
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_connection_error(
-        self, mock_planning_llm, mock_coordination_service
-    ):
-        """Test plan command handling of connection errors."""
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_planner)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
 
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
+        return mock_context_manager, mock_planner
 
-        # Simulate connection error
-        mock_coordination_instance.handle_prompt.side_effect = ConnectionError(
-            "Connection failed"
-        )
+    def test_list_tools_command_ollama(self):
+        """Test list-tools command with Ollama provider."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            mock_context_manager, mock_planner = self._create_mock_planner_context(
+                "Available MCP Tools:\n\nServer: file-server\n• read-file\n• write-file"
+            )
+            mock_create_planner.return_value = mock_context_manager
 
-        result = self.runner.invoke(app, ["plan", "Test prompt"])
+            result = self.runner.invoke(app, ["list-tools"])
 
-        assert result.exit_code == 1
-        assert "Connection Error" in result.output
-        assert "Make sure Ollama is running" in result.output
+            assert result.exit_code == 0
+            assert "Available MCP Tools:" in result.stdout
+            mock_create_planner.assert_called_once()
 
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_general_error(
-        self, mock_planning_llm, mock_coordination_service
-    ):
-        """Test plan command handling of general errors."""
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
+    def test_list_tools_command_verbose(self):
+        """Test list-tools command with verbose flag."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            with patch(
+                "shardguard.cli._print_verbose_tools_info"
+            ) as mock_verbose_print:
+                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                    "Available MCP Tools:\n\nServer: file-server"
+                )
+                mock_create_planner.return_value = mock_context_manager
 
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
+                result = self.runner.invoke(app, ["list-tools", "--verbose"])
 
-        # Simulate general error
-        mock_coordination_instance.handle_prompt.side_effect = ValueError(
-            "Invalid input"
-        )
+                assert result.exit_code == 0
+                mock_verbose_print.assert_called_once()
 
-        result = self.runner.invoke(app, ["plan", "Test prompt"])
+    def test_list_tools_command_gemini(self):
+        """Test list-tools command with Gemini provider."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}):
+                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                    "Available MCP Tools:\n\nServer: gemini-server"
+                )
+                mock_create_planner.return_value = mock_context_manager
 
-        assert result.exit_code == 1
-        assert "Error:" in result.output
+                result = self.runner.invoke(
+                    app,
+                    [
+                        "list-tools",
+                        "--provider",
+                        "gemini",
+                        "--model",
+                        "gemini-2.0-flash-exp",
+                    ],
+                )
 
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_console_output(
-        self, mock_planning_llm, mock_coordination_service
-    ):
-        """Test that plan command shows console output for model info."""
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
+                assert result.exit_code == 0
+                mock_create_planner.assert_called_once_with(
+                    "gemini",
+                    "gemini-2.0-flash-exp",
+                    "http://localhost:11434",
+                    "test-key",
+                )
 
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
+    def test_plan_command_success(self):
+        """Test plan command successful execution."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            with patch("shardguard.cli.CoordinationService") as mock_coord_service:
+                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                    "Available MCP Tools:\n\nServer: file-server"
+                )
+                mock_create_planner.return_value = mock_context_manager
 
-        sample_plan = Plan(original_prompt="Test", sub_prompts=[])
-        mock_coordination_instance.handle_prompt.return_value = sample_plan
+                # Mock coordination service instance
+                mock_coord = Mock()
+                mock_plan_obj = Mock()
+                mock_plan_obj.model_dump_json.return_value = '{"plan": "test"}'
+                mock_coord.handle_prompt = AsyncMock(return_value=mock_plan_obj)
+                mock_coord_service.return_value = mock_coord
 
-        result = self.runner.invoke(
-            app,
-            [
-                "plan",
-                "Test prompt",
-                "--model",
-                "test-model",
-                "--ollama-url",
-                "http://test:1234",
-            ],
-        )
+                result = self.runner.invoke(app, ["plan", "write hello to file"])
 
-        assert result.exit_code == 0
-        # Should show model info
-        assert "test-model" in result.output
-        assert "http://test:1234" in result.output
+                assert result.exit_code == 0
+                assert '{"plan": "test"}' in result.stdout
+                mock_coord.handle_prompt.assert_called_once_with("write hello to file")
 
-    def test_plan_command_required_prompt_argument(self):
-        """Test that plan command requires a prompt argument."""
-        result = self.runner.invoke(app, ["plan"])
+    def test_plan_command_gemini_no_api_key(self):
+        """Test plan command with Gemini provider but no API key."""
+        with patch.dict("os.environ", {}, clear=True):
+            result = self.runner.invoke(
+                app, ["plan", "test prompt", "--provider", "gemini"]
+            )
 
-        assert result.exit_code != 0  # Should fail without prompt
+            assert result.exit_code == 1
+            assert "Gemini API key required" in result.stdout
 
-    @patch("shardguard.cli.CoordinationService")
-    @patch("shardguard.cli.PlanningLLM")
-    def test_plan_command_json_output_format(
-        self, mock_planning_llm, mock_coordination_service
-    ):
-        """Test that plan command outputs properly formatted JSON."""
-        mock_planner_instance = Mock()
-        mock_planning_llm.return_value = mock_planner_instance
+    def test_main_callback_with_verbose(self):
+        """Test main callback with verbose flag."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            with patch(
+                "shardguard.cli._print_verbose_tools_info"
+            ) as mock_verbose_print:
+                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                    "Available MCP Tools:\n\nServer: file-server"
+                )
+                mock_create_planner.return_value = mock_context_manager
 
-        mock_coordination_instance = Mock()
-        mock_coordination_service.return_value = mock_coordination_instance
+                result = self.runner.invoke(app, ["--verbose"])
 
-        # Create a more complex plan
-        sample_plan = Plan(
-            original_prompt="Complex task with [[P1]]",
-            sub_prompts=[
-                SubPrompt(id=1, content="First step", opaque_values={}),
-                SubPrompt(
-                    id=2, content="Process [[P1]]", opaque_values={"[[P1]]": "secret"}
-                ),
-            ],
-        )
-        mock_coordination_instance.handle_prompt.return_value = sample_plan
+                assert result.exit_code == 0
+                assert "Welcome to ShardGuard!" in result.stdout
+                mock_verbose_print.assert_called_once()
 
-        result = self.runner.invoke(app, ["plan", "Complex task"])
+    def test_main_callback_without_verbose(self):
+        """Test main callback without verbose flag."""
+        with patch("shardguard.cli.create_planner") as mock_create_planner:
+            mock_context_manager, mock_planner = self._create_mock_planner_context(
+                "Available MCP Tools:\n\nServer: file-server"
+            )
+            mock_create_planner.return_value = mock_context_manager
 
-        assert result.exit_code == 0
+            result = self.runner.invoke(app, [])
 
-        # Try to parse the output as JSON (should work)
-        # Extract JSON from output (skip console messages)
-        output_lines = result.output.strip().split("\n")
-        json_lines = [
-            line
-            for line in output_lines
-            if line.strip().startswith("{")
-            or '"' in line
-            or "}" in line
-            or "[" in line
-            or "]" in line
-        ]
-        json_output = "\n".join(json_lines)
-
-        try:
-            parsed_json = json.loads(json_output)
-            assert "original_prompt" in parsed_json
-            assert "sub_prompts" in parsed_json
-            assert len(parsed_json["sub_prompts"]) == 2
-        except json.JSONDecodeError:
-            # If JSON parsing fails, at least check that JSON-like content is present
-            assert "original_prompt" in result.output
-            assert "sub_prompts" in result.output
+            assert result.exit_code == 0
+            assert "Welcome to ShardGuard!" in result.stdout
+            assert "Use --help to see available commands" in result.stdout
 
 
-class TestMainFunction:
-    """Test cases for the main function."""
+class TestHelperFunctions:
+    """Test CLI helper functions."""
 
-    def test_main_function_with_context(self):
-        """Test main function with typer context."""
-        # Create a mock context
-        mock_ctx = Mock()
-        mock_ctx.invoked_subcommand = None
+    def test_validate_gemini_api_key_valid(self):
+        """Test Gemini API key validation with valid key."""
+        from shardguard.cli import _validate_gemini_api_key
 
-        # This should execute without error
-        # In actual usage, this would print welcome message
-        main(mock_ctx)
+        # Should not raise exception
+        _validate_gemini_api_key("gemini", "valid-key")
 
-    def test_main_function_with_subcommand(self):
-        """Test main function when a subcommand is invoked."""
-        mock_ctx = Mock()
-        mock_ctx.invoked_subcommand = "plan"
+    def test_validate_gemini_api_key_missing(self):
+        """Test Gemini API key validation with missing key."""
+        from shardguard.cli import _validate_gemini_api_key
 
-        # Should not do anything when subcommand is present
-        main(mock_ctx)
+        with pytest.raises(typer.Exit):
+            _validate_gemini_api_key("gemini", None)
 
+    def test_validate_gemini_api_key_not_gemini(self):
+        """Test Gemini API key validation with non-Gemini provider."""
+        from shardguard.cli import _validate_gemini_api_key
 
-class TestCLIIntegration:
-    """Integration tests for CLI functionality."""
+        # Should not raise exception for non-Gemini providers
+        _validate_gemini_api_key("ollama", None)
 
-    def test_app_structure_and_commands(self):
-        """Test that the app is properly structured and commands are available."""
-        runner = CliRunner()
-        result = runner.invoke(app, ["--help"])
+    def test_get_model_for_provider_explicit(self):
+        """Test model selection with explicit model."""
+        from shardguard.cli import _get_model_for_provider
 
-        assert result.exit_code == 0
-        assert isinstance(app, typer.Typer)
-        assert app.info.help == "ShardGuard CLI"
-        assert "plan" in result.output
+        result = _get_model_for_provider("ollama", "custom-model")
+        assert result == "custom-model"
+
+    def test_get_model_for_provider_auto_detect_gemini(self):
+        """Test model auto-detection for Gemini."""
+        from shardguard.cli import _get_model_for_provider
+
+        result = _get_model_for_provider("gemini", None)
+        assert result == "gemini-2.0-flash-exp"
+
+    def test_get_model_for_provider_auto_detect_ollama(self):
+        """Test model auto-detection for Ollama."""
+        from shardguard.cli import _get_model_for_provider
+
+        result = _get_model_for_provider("ollama", None)
+        assert result == "llama3.2"

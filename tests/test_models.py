@@ -40,6 +40,25 @@ class TestSubPrompt:
         with pytest.raises(ValidationError):
             SubPrompt(**kwargs)
 
+    def test_subprompt_with_suggested_tools(self):
+        """Test creating a SubPrompt with suggested tools."""
+        sub_prompt = SubPrompt(
+            id=1,
+            content="Test content",
+            opaque_values={},
+            suggested_tools=["read_file", "write_file"],
+        )
+
+        assert sub_prompt.id == 1
+        assert sub_prompt.content == "Test content"
+        assert sub_prompt.opaque_values == {}
+        assert sub_prompt.suggested_tools == ["read_file", "write_file"]
+
+    def test_subprompt_default_suggested_tools(self):
+        """Test that suggested_tools defaults to empty list."""
+        sub_prompt = SubPrompt(id=1, content="Test content")
+        assert sub_prompt.suggested_tools == []
+
 
 class TestPlan:
     """Test cases for Plan model."""
