@@ -2017,4 +2017,4 @@ dev = ["bandit", "mypy", "pre-commit", "pydocstyle", "pytest", "pytest-asyncio",
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "be3a1e393ac71b774a0d287dca1d8981e88106f8fd0e315aaca3890b5e8ab93c"
+content-hash = "acf6ea26a62859471f9bae87cb72ff0c1c5baee9ca022f5e49abbeb95ac19e36"

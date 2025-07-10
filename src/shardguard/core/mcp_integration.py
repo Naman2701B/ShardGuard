@@ -42,6 +42,11 @@ class MCPClient:
                 "args": [os.path.join(servers_dir, "web_server.py")],
                 "description": "Web operations with security controls",
             },
+            "nuke-operations": {
+                "command": sys.executable,
+                "args": [os.path.join(servers_dir, "nuke_server.py")],
+                "description": "Nuke operations with security controls",
+            },
         }
 
     async def _execute_with_server(self, server_name: str, operation):

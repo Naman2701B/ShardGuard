@@ -13,3 +13,7 @@ John Smith's record with SSN 123-45-6789, update his salary in the database, and
 Please schedule a meeting with my Dr. Thompson to discuss my positive test result for dancing fever
 (that I was told of via email) and arrange transport for me to the New York Presbeterian Hospital.
 ```
+
+```text
+Verify launch code ZULU-RED-0939 issued by Commander Nora
+```
