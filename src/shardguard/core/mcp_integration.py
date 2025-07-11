@@ -13,6 +13,22 @@ logger = logging.getLogger(__name__)
 class MCPClient:
     """Client for communicating with MCP servers."""
 
+    def load_server_configs(servers_dir):
+        import os
+        server_configs = {}
+
+        for filename in os.listdir(servers_dir):
+            if filename.endswith("_server.py"):
+                base = filename[:-3]  # remove .py
+                name = base.replace("_server", "").replace("_", "-")
+                server_configs[name] = {
+                    "command": sys.executable,
+                    "args": [os.path.join(servers_dir, filename)],
+                    "description": f"{name.replace('-', ' ').capitalize()} with security controls"
+                }
+
+        return server_configs
+
     def __init__(self):
         """Initialize the MCP client."""
         import os
@@ -21,33 +37,8 @@ class MCPClient:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         servers_dir = os.path.join(os.path.dirname(current_dir), "mcp_servers")
 
-        self.server_configs = {
-            "file-operations": {
-                "command": sys.executable,
-                "args": [os.path.join(servers_dir, "file_server.py")],
-                "description": "File operations with security controls",
-            },
-            "email-operations": {
-                "command": sys.executable,
-                "args": [os.path.join(servers_dir, "email_server.py")],
-                "description": "Email operations with privacy controls",
-            },
-            "database-operations": {
-                "command": sys.executable,
-                "args": [os.path.join(servers_dir, "database_server.py")],
-                "description": "Database operations with security controls",
-            },
-            "web-operations": {
-                "command": sys.executable,
-                "args": [os.path.join(servers_dir, "web_server.py")],
-                "description": "Web operations with security controls",
-            },
-            "nuke-operations": {
-                "command": sys.executable,
-                "args": [os.path.join(servers_dir, "nuke_server.py")],
-                "description": "Nuke operations with security controls",
-            },
-        }
+        self.server_configs = MCPClient.load_server_configs(servers_dir)
+        print(self.server_configs)
 
     async def _execute_with_server(self, server_name: str, operation):
         """Execute an operation with a server connection."""
