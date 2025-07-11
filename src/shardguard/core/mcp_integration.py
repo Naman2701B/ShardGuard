@@ -38,7 +38,6 @@ class MCPClient:
         servers_dir = os.path.join(os.path.dirname(current_dir), "mcp_servers")
 
         self.server_configs = MCPClient.load_server_configs(servers_dir)
-        print(self.server_configs)
 
     async def _execute_with_server(self, server_name: str, operation):
         """Execute an operation with a server connection."""
