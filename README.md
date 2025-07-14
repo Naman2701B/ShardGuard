@@ -165,11 +165,13 @@ src/shardguard/
 ShardGuard uses a YAML-based tool registry to define and manage Model Context Protocol (MCP) operations securely.
 You can create your own MCP server by defining tools in `servers.yaml`.
 
-> Define your tools in `servers.yaml`
-> Each operation is grouped by **Server Name** (e.g., file-operations, database-operations, etc.). For each tool, specify:
-> name: A unique identifier used when calling the tool
-> description: Human-readable summary
-> inputSchema: JSON Schema to validate expected inputs
+**Steps:**
+
+1. Define your tools in `servers.yaml`
+2. Each operation is grouped by **Server Name** (e.g., file-operations, database-operations, etc.). For each tool, specify:
+   - name: A unique identifier used when calling the tool
+   - description: Human-readable summary
+   - inputSchema: JSON Schema to validate expected inputs
 
 ### Example Output
 
