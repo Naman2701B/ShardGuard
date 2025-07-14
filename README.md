@@ -160,6 +160,17 @@ src/shardguard/
     └── logging.py      # Logging utilities
 ```
 
+### Guide to Creating Your Own MCP Server
+
+ShardGuard uses a YAML-based tool registry to define and manage Model Context Protocol (MCP) operations securely.
+You can create your own MCP server by defining tools in `servers.yaml`.
+
+> Define your tools in `servers.yaml`
+> Each operation is grouped by **Server Name** (e.g., file-operations, database-operations, etc.). For each tool, specify:
+> name: A unique identifier used when calling the tool
+> description: Human-readable summary
+> inputSchema: JSON Schema to validate expected inputs
+
 ### Example Output
 
 ```json
