@@ -153,6 +153,9 @@ src/shardguard/
 │   ├── models.py       # Data models
 │   ├── planning.py     # Planning LLM implementations
 │   └── prompts.py      # Prompt templates
+|-- mcp_servers/
+|   |-- run_server.py   # Service running to handle the servers
+|   |-- servers.yaml    # YAML file containing all the tools and server descriptions
 └── utils/
     └── logging.py      # Logging utilities
 ```
