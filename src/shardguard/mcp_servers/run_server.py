@@ -6,8 +6,6 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-print("[DEBUG] run_server.py STARTED")
-
 # Load tool configuration from YAML
 def load_tools_from_yaml(server_name: str, path: str = None) -> list[Tool]:
     import os
@@ -67,8 +65,6 @@ async def main():
         help="Name of the server (e.g., blockchain-operations)",
     )
     args = parser.parse_args()
-
-    print(f"[DEBUG] Parsed args: {args}")
 
     server = create_server(args.server_name)
     async with stdio_server() as (read_stream, write_stream):
