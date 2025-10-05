@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Any, List
 
 
 class SubPrompt(BaseModel):
@@ -11,3 +12,9 @@ class SubPrompt(BaseModel):
 class Plan(BaseModel):
     original_prompt: str
     sub_prompts: list[SubPrompt]
+
+# Step Model for breaking the subprompts into executable steps
+class Step(BaseModel):
+    id: str
+    description: str
+    tools: List[Any] = []  # objects with .server and .name
