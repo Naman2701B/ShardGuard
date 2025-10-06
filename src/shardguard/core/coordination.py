@@ -70,18 +70,18 @@ class CoordinationService:
         resolved_values = {}
         if argument_dicts:
             for arg_dict in argument_dicts:
-                    for arg_map in self.args:
-                        if arg_dict in arg_map:
-                            resolved_values[arg_dict] = self.args[arg_dict]
-                            break
+                if arg_dict in self.args:
+                    resolved_values[arg_dict] = self.args[arg_dict]
+                    break
 
-            for calls in LLMStepResponse.tool_calls:
-                await MCPClient.call_tool(
-                    mcp,
-                    calls.server,
-                    calls.tool,
-                    resolved_values
-                )
+        for calls in LLMStepResponse.tool_calls:
+            await MCPClient.call_tool(
+                mcp,
+                calls.server,
+                calls.tool,
+                resolved_values
+            )
+            print(f"Executed {calls.server}: {calls.tool} with {argument_dicts}")
         return
     
     async def handle_subtasks(self, tasks):

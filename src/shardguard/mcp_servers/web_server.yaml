@@ -1,0 +1,38 @@
+server: web-operations
+description: Web operations MCP server for ShardGuard.
+tools:
+  - name: http_request
+    description: Make an HTTP request (PoC- prints action)
+    properties:
+      - name: url
+        type: string
+        description: URL to make request to
+      - name: method
+        type: string
+        description: HTTP method
+      - name: headers
+        type: object
+        description: HTTP headers as key-value pairs
+      - name: body
+        type: string
+        description: Request body content
+
+  - name: scrape_website
+    description: Scrape content from a website (PoC- prints action)
+    properties:
+      - name: url
+        type: string
+        description: URL to scrape
+      - name: selector
+        type: string
+        description: CSS selector for specific content
+
+  - name: download_file
+    description: Download a file from the web (PoC- prints action)
+    properties:
+      - name: url
+        type: string
+        description: URL of file to download
+      - name: filename
+        type: string
+        description: Local filename to save as

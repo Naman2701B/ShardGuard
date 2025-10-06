@@ -1,0 +1,29 @@
+server: database-operations
+description: Database operations MCP server for ShardGuard.
+tools:
+  - name: query_database
+    description: Execute a database query (PoC- prints action)
+    properties:
+      - name: query
+        type: string
+        description: SQL query to execute
+      - name: database
+        type: string
+        description: Database name
+
+  - name: backup_database
+    description: Create a database backup (PoC- prints action)
+    properties:
+      - name: database
+        type: string
+        description: Database name to backup
+      - name: backup_name
+        type: string
+        description: Name for the backup file
+
+  - name: list_tables
+    description: List tables in a database (PoC- prints action)
+    properties:
+      - name: database
+        type: string
+        description: Database name to list tables from
