@@ -1,0 +1,26 @@
+server: file-operations
+description: File operations MCP server for ShardGuard.
+tools:
+  - name: read_file
+    description: Read contents from a file
+    properties:
+      - name: path
+        type: string
+        description: Path to the file to read
+
+  - name: write_file
+    description: Write content to a file
+    properties:
+      - name: path
+        type: string
+        description: Path to the file to write
+      - name: content
+        type: string
+        description: Content to write to the file
+
+  - name: list_directory
+    description: List contents of a directory
+    properties:
+      - name: path
+        type: string
+        description: Path to the directory to list

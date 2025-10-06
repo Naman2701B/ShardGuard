@@ -1,0 +1,22 @@
+server: email-operations
+description: Email operations MCP server for ShardGuard.
+tools:
+  - name: send_email
+    description: Send an email (PoC- prints action)
+    properties:
+      - name: recipient
+        type: string
+        description: Email recipient address
+      - name: subject
+        type: string
+        description: Email subject line
+      - name: body
+        type: string
+        description: Email body content
+
+  - name: list_emails
+    description: List recent emails (PoC- prints action)
+    properties:
+      - name: limit
+        type: integer
+        description: Maximum number of emails to list
