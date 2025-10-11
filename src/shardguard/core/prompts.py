@@ -17,7 +17,8 @@ Your mission
    • Use the *same* placeholder everywhere that value appears.
    • Do **not** reuse a placeholder for different values.
 3. **Decompose** the redacted prompt into clear, numbered subtasks.
-4. **Consider available MCP tools** when breaking down tasks.
+4. **Consider available MCP tools** when breaking down tasks - if a task can be accomplished using
+   an available tool, mention the relevant tool in the subtask description.
 5. **Return** ONLY a valid JSON object (no markdown formatting, no code blocks, no explanatory text).
 
 CRITICAL: Your response must be ONLY raw JSON that follows the exact schema below.
@@ -39,11 +40,12 @@ Your response must be ONLY this JSON structure (no other text):
   "sub_prompts": [
     {{
       "id": 1,
-      "content": "<subtask with [[Pn]] tokens>",
+      "content": "<subtask with [[Pn]] tokens, optionally mentioning relevant MCP tools>",
       "opaque_values": {{
         "[[P_n]]": "<corresponding data>",
         ...
       }},
+      "suggested_tools": ["<tool_name>", ...]
     }}
   ]
 }}

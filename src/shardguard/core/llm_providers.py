@@ -31,7 +31,7 @@ class OllamaProvider(LLMProvider):
     """Ollama LLM provider for local models."""
 
     def __init__(
-        self, model: str = "llama3.2", base_url: str = "http://localhost:11434"
+        self, model: str = os.getenv("OLLAMA_MODEL"), base_url: str = os.getenv("BASE_URL")
     ):
         self.model = model
         self.base_url = base_url

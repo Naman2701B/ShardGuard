@@ -36,8 +36,8 @@ def _count_tools_and_servers(tools_description: str) -> tuple[int, int]:
 @asynccontextmanager
 async def create_planner(
     provider_type: str = "ollama",
-    model: str = "llama3.2",
-    base_url: str = "http://localhost:11434",
+    model: str = os.getenv("OLLAMA_MODEL"),
+    base_url: str = os.getenv("BASE_URL"),
     api_key: str | None = None,
 ):
     """Create and manage a PlanningLLM instance with proper cleanup."""
@@ -81,7 +81,7 @@ def _get_model_for_provider(provider: str, model: str | None) -> str:
     """Get the model name for the provider, auto-detecting if not specified."""
     if model is not None:
         return model
-    return "gemini-2.0-flash-exp" if provider == "gemini" else "llama3.2"
+    return "gemini-2.0-flash-exp" if provider == "gemini" else os.getenv("OLLAMA_MODEL")
 
 
 def _print_provider_info(provider: str, model: str, ollama_url: str) -> None:

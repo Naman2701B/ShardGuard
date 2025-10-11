@@ -4,6 +4,7 @@ import json
 import logging
 import re
 from typing import Protocol
+import os
 
 from shardguard.core.llm_providers import LLMProviderFactory
 from shardguard.core.mcp_integration import MCPClient
@@ -23,8 +24,8 @@ class PlanningLLM:
     def __init__(
         self,
         provider_type: str = "ollama",
-        model: str = "llama3.2",
-        base_url: str = "http://localhost:11434",
+        model: str = os.getenv("OLLAMA_MODEL"),
+        base_url: str = os.getenv("BASE_URL"),
         api_key: str | None = None,
     ):
         """Initialize with MCP client integration and configurable LLM provider."""

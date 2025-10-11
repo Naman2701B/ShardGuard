@@ -7,6 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import os
 
 from jsonschema import validate as jsonschema_validate
 from abc import ABC, abstractmethod
@@ -94,8 +95,8 @@ class GenericExecutionLLM(ExecutionLLM):
     def __init__(
         self,
         provider_type: str = "ollama",
-        model: str = "llama3.2",
-        base_url: str = "http://localhost:11434",
+        model: str = os.getenv("OLLAMA_MODEL"),
+        base_url: str = os.getenv("BASE_URL"),
         api_key: Optional[str] = None,
     ):
         self.provider_type = provider_type
@@ -164,8 +165,8 @@ class StepExecutor:
 
 def make_execution_llm(
     provider_type: str = "ollama",
-    model: str = "llama3.2",
-    base_url: str = "http://localhost:11434",
+    model: str = os.getenv("OLLAMA_MODEL"),
+    base_url: str = os.getenv("BASE_URL"),
     api_key: Optional[str] = None,
 ) -> GenericExecutionLLM:
     """
