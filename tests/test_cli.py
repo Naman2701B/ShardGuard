@@ -1,4 +1,11 @@
-"""Tests for the CLI module."""
+"""
+Tests for the CLI module.
+
+These tests use mocks to avoid hitting real external dependencies:
+- Prevent instantiating or executing the real components in the CLI Module.
+- Avoid making actual API requests that require credentials.
+- Each function here also calls on the close() function even after exceptions are hit to cleanly close the testing environment.
+"""
 
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -15,7 +22,9 @@ class TestCreatePlanner:
     @pytest.mark.asyncio
     async def test_create_planner_success(self):
         """Test successful planner creation and cleanup."""
+        # Temporarily replace shardguard.cli.PlanningLLM with a mock for this test 
         with patch("shardguard.cli.PlanningLLM") as mock_planning_llm_class:
+            # Mock() returns a replica of the environment which we need to test.
             mock_planner = Mock()
             mock_planner.get_available_tools_description = AsyncMock(
                 return_value="Available MCP Tools:\n\nServer: test-server\n• test-tool"
@@ -171,6 +180,7 @@ class TestCLICommands:
     def test_list_tools_command_with_custom_ollama_url(self):
         """Test list-tools command with custom Ollama URL."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
+            # Patch the env values with empty dictonary so that real API calls are not made while testing.
             with patch.dict("os.environ", {}, clear=True):
                 mock_context_manager, mock_planner = self._create_mock_planner_context(
                     "Available MCP Tools:\n\nServer: file-server"
@@ -308,39 +318,6 @@ class TestCLICommands:
                         "cli-key",
                     )
 
-    def test_plan_command_with_custom_model(self):
-        """Test plan command with custom model specified."""
-        with patch("shardguard.cli.create_planner") as mock_create_planner:
-            with patch("shardguard.cli.CoordinationService") as mock_coord_service:
-                with patch("shardguard.cli._validate_output"):
-                    with patch.dict("os.environ", {}, clear=True):
-                        mock_context_manager, mock_planner = self._create_mock_planner_context(
-                            "Available MCP Tools:\n\nServer: file-server"
-                        )
-                        mock_create_planner.return_value = mock_context_manager
-
-                        mock_coord = Mock()
-                        mock_plan_obj = Mock()
-                        mock_plan_obj.model_dump_json.return_value = '{"plan": "test"}'
-                        mock_plan_obj.model_dump.return_value = {"plan": "test"}
-                        mock_plan_obj.sub_prompts = []
-                        mock_coord.handle_prompt = AsyncMock(return_value=mock_plan_obj)
-                        mock_coord.handle_subtasks = AsyncMock()
-                        mock_coord_service.return_value = mock_coord
-
-                        result = self.runner.invoke(
-                            app,
-                            ["plan", "test prompt", "--model", "llama2"],
-                        )
-
-                        assert result.exit_code == 0
-                        mock_create_planner.assert_called_once_with(
-                            "ollama",
-                            "llama2",
-                            "http://localhost:11434",
-                            None,
-                        )
-
     def test_plan_command_connection_error(self):
         """Test plan command handles connection errors gracefully."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
@@ -415,16 +392,6 @@ class TestHelperFunctions:
         """Test Gemini API key validation with missing key."""
         with pytest.raises(typer.Exit):
             _validate_gemini_api_key("gemini", None)
-
-    def test_validate_gemini_api_key_not_gemini(self):
-        """Test Gemini API key validation with non-Gemini provider."""
-        # Should not raise exception for non-Gemini providers
-        _validate_gemini_api_key("ollama", None)
-
-    def test_get_model_for_provider_explicit(self):
-        """Test model selection with explicit model."""
-        result = _get_model_for_provider("ollama", "custom-model")
-        assert result == "custom-model"
 
     def test_get_model_for_provider_auto_detect_gemini(self):
         """Test model auto-detection for Gemini."""

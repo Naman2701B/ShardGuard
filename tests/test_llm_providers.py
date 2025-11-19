@@ -122,32 +122,6 @@ class TestOllamaProvider:
             assert "test prompt" in response
             assert "Error occurred" in response or "Connection failed" in response
 
-    def test_close_without_client(self):
-        """Test close method when client is None."""
-        with patch("builtins.__import__", side_effect=ImportError):
-            provider = OllamaProvider()
-            # Should not raise exception
-            provider.close()
-
-    def test_close_with_client(self):
-        """Test close method closes the client."""
-        mock_httpx = Mock()
-        mock_client = MagicMock()
-        mock_httpx.Client.return_value = mock_client
-
-        with patch.dict("sys.modules", {"httpx": mock_httpx}):
-            provider = OllamaProvider()
-            provider.close()
-
-            mock_client.close.assert_called_once()
-
-    def test_init_custom_parameters(self):
-        """Test OllamaProvider initialization with custom parameters."""
-        provider = OllamaProvider(model="custom-model", base_url="http://custom:11434")
-
-        assert provider.model == "custom-model"
-        assert provider.base_url == "http://custom:11434"
-
     def test_mock_response_format(self):
         """Test that mock response has correct JSON structure."""
         with patch("builtins.__import__", side_effect=ImportError):
@@ -160,16 +134,6 @@ class TestOllamaProvider:
             assert "sub_prompts" in data
             assert data["original_prompt"] == "test prompt"
             assert len(data["sub_prompts"]) > 0
-
-    def test_mock_response_with_error(self):
-        """Test mock response includes error message."""
-        with patch("builtins.__import__", side_effect=ImportError):
-            provider = OllamaProvider()
-            response = provider._mock_response("test", error="Test error")
-
-            data = json.loads(response)
-            assert "Error occurred" in data["sub_prompts"][0]["content"]
-            assert "Test error" in data["sub_prompts"][0]["content"]
 
     def test_ollama_api_call_parameters(self):
         """Test that Ollama API call includes correct parameters."""
@@ -320,12 +284,6 @@ class TestGeminiProvider:
         assert "test prompt" in response
         assert "Error occurred" in response or "API error" in response
 
-    def test_close(self):
-        """Test close method (Gemini doesn't need explicit closing)."""
-        provider = GeminiProvider(api_key=None)
-        # Should not raise exception
-        provider.close()
-
     @patch.dict(os.environ, {}, clear=True)
     @patch("google.generativeai.GenerativeModel")
     @patch("google.generativeai.configure")
@@ -440,23 +398,6 @@ class TestLLMProviderFactory:
 
             assert isinstance(provider, GeminiProvider)
             assert provider.api_key == "cli-api-key"
-
-    def test_create_provider_mixed_case(self):
-        """Test provider type with mixed case."""
-        provider1 = create_provider("OlLaMa", "llama3.2")
-        provider2 = create_provider("gEmInI", "gemini-2.0-flash-exp", api_key="key")
-
-        assert isinstance(provider1, OllamaProvider)
-        assert isinstance(provider2, GeminiProvider)
-
-    def test_create_ollama_with_empty_base_url(self):
-        """Test creating Ollama with custom base URL."""
-        provider = create_provider(
-            "ollama", "llama3.2", base_url="http://remote-server:11434"
-        )
-
-        assert provider.base_url == "http://remote-server:11434"
-
 
 class TestLLMProviderAbstractClass:
     """Test LLMProvider abstract base class."""

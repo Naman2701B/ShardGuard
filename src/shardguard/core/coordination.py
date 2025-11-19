@@ -56,7 +56,7 @@ class CoordinationService:
             return dict(vars(obj))
         raise TypeError(f"Unsupported step type: {type(obj)!r}. Provide a dict-like object.")
     
-    async def check_tool(self, suggested_tools) -> bool:
+    async def check_tool(self, suggested_tools) -> list[bool]:
         """Check whether the Planning LLM gave the tools only from those present with us and not hallucinate"""
         mcp = MCPClient()
         tools = await mcp.list_tool_names()
@@ -80,6 +80,7 @@ class CoordinationService:
         # Looping into subprompts to get suggested tools, and check the tool exists in the system before execution starts
         tool_check = [] # this is an array as we want all the Sub Prompts to have the tools only existing in the system
         for items in plan_tool_check["sub_prompts"]:
+            print(items["suggested_tools"])
             tool_check_results = await self.check_tool(items["suggested_tools"])
             if False in tool_check_results:
                 tool_check.append(False)
@@ -134,7 +135,8 @@ class CoordinationService:
                 per_tool_args.update(call.args)
 
             result = await mcp.call_tool(call.server, call.tool, per_tool_args)
-            # Validating the result from the tool call with the expected schema
+            # Validating the result from the tool call with the expected schema - 
+            #   This can be removed later as we do not want to restrict the execution on the schema
             _validate_output(result, output_schema, where="Tool Call")
 
             logger.warning(f"{call.server}: {call.tool} was called with the parameters: {per_tool_args}")

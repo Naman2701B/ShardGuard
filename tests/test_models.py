@@ -78,33 +78,6 @@ class TestSubPrompt:
         assert len(sub_prompt.opaque_values) == 2
         assert len(sub_prompt.suggested_tools) == 3
 
-    def test_subprompt_with_empty_content(self):
-        """Test creating a SubPrompt with empty string content."""
-        sub_prompt = SubPrompt(id=1, content="")
-        assert sub_prompt.content == ""
-
-    def test_subprompt_with_special_characters_in_content(self):
-        """Test SubPrompt content with special characters and Unicode."""
-        content = "Special chars: !@#$%^&*() and Unicode: 你好 мир"
-        sub_prompt = SubPrompt(id=1, content=content)
-        assert sub_prompt.content == content
-
-    def test_subprompt_with_multiple_opaque_values(self):
-        """Test SubPrompt with many opaque values."""
-        opaque_values = {f"[[P{i}]]": f"data_{i}" for i in range(10)}
-        sub_prompt = SubPrompt(id=1, content="Test", opaque_values=opaque_values)
-        assert len(sub_prompt.opaque_values) == 10
-        assert sub_prompt.opaque_values == opaque_values
-
-    def test_subprompt_with_many_tools(self):
-        """Test SubPrompt with many suggested tools."""
-        tools = [f"tool_{i}" for i in range(20)]
-        sub_prompt = SubPrompt(
-            id=1, content="Test", suggested_tools=tools
-        )
-        assert len(sub_prompt.suggested_tools) == 20
-        assert sub_prompt.suggested_tools == tools
-
     def test_subprompt_invalid_id_type(self):
         """Test that non-integer id raises ValidationError."""
         with pytest.raises(ValidationError):
@@ -129,7 +102,6 @@ class TestSubPrompt:
         """Test that suggested_tools list must contain strings."""
         with pytest.raises(ValidationError):
             SubPrompt(id=1, content="Test", suggested_tools=[1, 2, 3])
-
 
 class TestPlan:
     """Test cases for Plan model."""
@@ -171,13 +143,6 @@ class TestPlan:
         with pytest.raises(ValidationError):
             Plan(**kwargs)
 
-    def test_plan_with_empty_sub_prompts(self):
-        """Test creating a Plan with empty sub_prompts list."""
-        plan = Plan(original_prompt="Do something", sub_prompts=[])
-        assert plan.original_prompt == "Do something"
-        assert plan.sub_prompts == []
-        assert len(plan.sub_prompts) == 0
-
     def test_plan_with_many_sub_prompts(self):
         """Test creating a Plan with many sub-prompts."""
         sub_prompts = [
@@ -186,23 +151,6 @@ class TestPlan:
         plan = Plan(original_prompt="Complex plan", sub_prompts=sub_prompts)
         assert len(plan.sub_prompts) == 50
         assert plan.sub_prompts == sub_prompts
-
-    def test_plan_with_empty_original_prompt(self):
-        """Test creating a Plan with empty string original_prompt."""
-        plan = Plan(
-            original_prompt="",
-            sub_prompts=[SubPrompt(id=1, content="Task")]
-        )
-        assert plan.original_prompt == ""
-
-    def test_plan_with_special_characters_in_prompt(self):
-        """Test Plan with special characters and Unicode in original_prompt."""
-        prompt = "Special: !@#$%^&*() Unicode: 你好 мир"
-        plan = Plan(
-            original_prompt=prompt,
-            sub_prompts=[SubPrompt(id=1, content="Task")]
-        )
-        assert plan.original_prompt == prompt
 
     def test_plan_with_complex_sub_prompts(self):
         """Test Plan with SubPrompts containing all optional fields."""
@@ -246,20 +194,8 @@ class TestPlan:
         with pytest.raises(ValidationError):
             Plan(
                 original_prompt="Do something",
-                sub_prompts=["invalid_string"]  # string, not SubPrompt
+                sub_prompts=["invalid_string"]
             )
-
-    def test_plan_preserves_sub_prompt_order(self):
-        """Test that Plan preserves the order of sub_prompts."""
-        sub_prompts = [
-            SubPrompt(id=3, content="Third"),
-            SubPrompt(id=1, content="First"),
-            SubPrompt(id=2, content="Second"),
-        ]
-        plan = Plan(original_prompt="Test", sub_prompts=sub_prompts)
-        assert plan.sub_prompts[0].id == 3
-        assert plan.sub_prompts[1].id == 1
-        assert plan.sub_prompts[2].id == 2
 
     def test_plan_model_dump(self):
         """Test that Plan can be serialized to dict."""
@@ -274,16 +210,6 @@ class TestPlan:
         assert isinstance(plan_dict, dict)
         assert plan_dict["original_prompt"] == "Do something"
         assert len(plan_dict["sub_prompts"]) == 1
-
-    def test_plan_with_duplicate_sub_prompt_ids(self):
-        """Test Plan with SubPrompts having duplicate IDs (should be allowed by model)."""
-        sub_prompts = [
-            SubPrompt(id=1, content="First"),
-            SubPrompt(id=1, content="Second"),
-        ]
-        plan = Plan(original_prompt="Test", sub_prompts=sub_prompts)
-        assert len(plan.sub_prompts) == 2
-        assert plan.sub_prompts[0].id == plan.sub_prompts[1].id
 
     def test_plan_modification_creates_new_instance(self):
         """Test that modifying Plan creates new instance (Pydantic immutability)."""

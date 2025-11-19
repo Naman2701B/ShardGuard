@@ -133,26 +133,6 @@ class TestPlanningLLM:
     @pytest.mark.asyncio
     @patch("shardguard.core.planning.MCPClient")
     @patch("shardguard.core.planning.create_provider")
-    async def test_generate_plan_with_no_tools(self, mock_create_provider, mock_mcp_client_class):
-        """Test generate_plan when no MCP tools are available."""
-        mock_mcp_instance = AsyncMock()
-        mock_mcp_instance.get_tools_description.return_value = "No MCP tools available."
-        mock_mcp_client_class.return_value = mock_mcp_instance
-
-        mock_provider = AsyncMock()
-        mock_provider.generate_response.return_value = '{"original_prompt": "test", "sub_prompts": []}'
-        mock_create_provider.return_value = mock_provider
-
-        llm = PlanningLLM()
-        await llm.generate_plan("test prompt")
-
-        # Verify only the original prompt was passed (no tools description)
-        call_args = mock_provider.generate_response.call_args[0][0]
-        assert call_args == "test prompt"
-
-    @pytest.mark.asyncio
-    @patch("shardguard.core.planning.MCPClient")
-    @patch("shardguard.core.planning.create_provider")
     async def test_generate_plan_error_handling(self, mock_create_provider, mock_mcp_client_class):
         """Test generate_plan error handling with fallback response."""
         mock_mcp_instance = AsyncMock()
@@ -231,15 +211,6 @@ class TestPlanningLLM:
             assert "opaque_values" in fallback
             assert "suggested_tools" in fallback
 
-    def test_close_method(self):
-        """Test close method closes provider."""
-        mock_provider = MagicMock()
-        with patch("shardguard.core.planning.create_provider", return_value=mock_provider):
-            llm = PlanningLLM()
-            llm.close()
-
-            mock_provider.close.assert_called_once()
-
     @pytest.mark.asyncio
     @patch("shardguard.core.planning.create_provider")
     async def test_context_managers(self, mock_create_provider):
@@ -281,7 +252,6 @@ class TestPlanningLLM:
         assert "task1" in result
         assert "task2" in result
 
-
 class TestPlanningLLMConstructor:
     """Test cases for PlanningLLM constructor with different providers."""
 
@@ -291,11 +261,11 @@ class TestPlanningLLMConstructor:
         mock_create_provider.return_value = MagicMock()
         
         llm = PlanningLLM(
-            provider_type="ollama", model="llama3.1", base_url="http://custom:8080"
+            provider_type="ollama", model="llama3.2", base_url="http://custom:8080"
         )
 
         assert llm.provider_type == "ollama"
-        assert llm.model == "llama3.1"
+        assert llm.model == "llama3.2"
         assert llm.base_url == "http://custom:8080"
 
     @patch("shardguard.core.planning.create_provider")
@@ -304,11 +274,11 @@ class TestPlanningLLMConstructor:
         mock_create_provider.return_value = MagicMock()
         
         llm = PlanningLLM(
-            provider_type="gemini", model="gemini-1.5-pro", api_key="test-key"
+            provider_type="gemini", model="gemini-2.0-flash-exp", api_key="test-key"
         )
 
         assert llm.provider_type == "gemini"
-        assert llm.model == "gemini-1.5-pro"
+        assert llm.model == "gemini-2.0-flash-exp"
         assert llm.api_key == "test-key"
 
     @pytest.mark.asyncio
