@@ -166,6 +166,8 @@ class GeminiProvider(LLMProvider):
             # Gemini API is synchronous, so we'll run it as is
             response = self.client.generate_content(
                 prompt,
+                # If you change values here, make sure to change it in the test case as well, 
+                # we are testing whether the configuration is being set correctly by the provider
                 generation_config={
                     "temperature": 0.1,
                     "top_p": 0.9,

@@ -56,18 +56,20 @@ class CoordinationService:
             return dict(vars(obj))
         raise TypeError(f"Unsupported step type: {type(obj)!r}. Provide a dict-like object.")
     
-    async def check_tool(self, suggested_tools) -> bool:
+    async def check_tool(self, suggested_tools) -> list[bool]:
         """Check whether the Planning LLM gave the tools only from those present with us and not hallucinate"""
         mcp = MCPClient()
         tools = await mcp.list_tool_names()
         # Check on the length of suggested tools if there exist for the subprompt then only validate that the tool exist in the system, else return true and let it pass
+        suggested_tools_result = []
         if (len(suggested_tools)!=0):
             for tool in suggested_tools:
                 if tool in tools:
-                    return True
+                    suggested_tools_result.append(True)
                 else:
-                    return False
-        return True
+                    suggested_tools_result.append(False)
+        suggested_tools_result.append(True)
+        return suggested_tools_result
 
     async def handle_prompt(self, user_input: str) -> Plan:
         """Prepare the prompt by adding predefined context to design the plan of execution"""
@@ -78,7 +80,12 @@ class CoordinationService:
         # Looping into subprompts to get suggested tools, and check the tool exists in the system before execution starts
         tool_check = [] # this is an array as we want all the Sub Prompts to have the tools only existing in the system
         for items in plan_tool_check["sub_prompts"]:
-            tool_check.append(await self.check_tool(items["suggested_tools"]))
+            print(items["suggested_tools"])
+            tool_check_results = await self.check_tool(items["suggested_tools"])
+            if False in tool_check_results:
+                tool_check.append(False)
+            else:
+                tool_check.append(True)
         
         # Validating if all are True in the array, else PlanningLLM is re-executed
         if(not(False in tool_check)):
@@ -88,7 +95,7 @@ class CoordinationService:
             if(self.retryCount<=5):
                 self.retryCount+=1
                 logger.warning(f"Retrying Planning LLM due to invalid tool suggestion!")
-                await self.handle_prompt(user_input)
+                return await self.handle_prompt(user_input)
             else:
                 logger.error("Planning LLM failed to generate plan with tools for all subprompts!\n\n\t\tOR\n\nTools for a specific task does not exist!")
         return
@@ -128,7 +135,8 @@ class CoordinationService:
                 per_tool_args.update(call.args)
 
             result = await mcp.call_tool(call.server, call.tool, per_tool_args)
-            # Validating the result from the tool call with the expected schema
+            # Validating the result from the tool call with the expected schema - 
+            #   This can be removed later as we do not want to restrict the execution on the schema
             _validate_output(result, output_schema, where="Tool Call")
 
             logger.warning(f"{call.server}: {call.tool} was called with the parameters: {per_tool_args}")
