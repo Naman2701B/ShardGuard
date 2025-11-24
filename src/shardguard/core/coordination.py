@@ -68,7 +68,6 @@ class CoordinationService:
                     suggested_tools_result.append(True)
                 else:
                     suggested_tools_result.append(False)
-        suggested_tools_result.append(True)
         return suggested_tools_result
 
     async def handle_prompt(self, user_input: str) -> Plan:
