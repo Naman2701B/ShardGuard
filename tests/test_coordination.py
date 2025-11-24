@@ -211,7 +211,7 @@ class TestCoordinationService:
 
             result = await service.check_tool(["tool1", "tool2"])
 
-            assert result == [True, True, True]
+            assert result == [True, True]
 
     @pytest.mark.asyncio
     async def test_check_tool_some_tools_invalid(self):
@@ -244,7 +244,7 @@ class TestCoordinationService:
 
             result = await service.check_tool([])
 
-            assert result == [True]
+            assert result == []
 
     @pytest.mark.asyncio
     async def test_check_tool_all_tools_invalid(self):
@@ -528,6 +528,7 @@ class TestCoordinationService:
                         tasks,
                         provider="ollama",
                         detected_model="llama3.2",
+                        api_key="test-key-123"
                     )
 
                     assert mock_executor_class.call_count == 2
@@ -560,6 +561,7 @@ class TestCoordinationService:
                         [task],
                         provider="ollama",
                         detected_model="llama3.2",
+                        api_key="test-key-123"
                     )
 
                     call_args = mock_executor.run_step.call_args[0][0]
