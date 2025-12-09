@@ -9,6 +9,7 @@ from rich.console import Console
 
 from shardguard.core.coordination import CoordinationService
 from shardguard.core.planning import PlanningLLM
+from shardguard.mcp_servers import registry as reg_lib
 
 # Load environment variables from .env file
 try:
@@ -20,6 +21,18 @@ except ImportError:
 
 app = typer.Typer(help="ShardGuard CLI")
 console = Console()
+
+
+def log_success(msg: str):
+    console.print(f"[green]{msg}[/green]")
+
+
+def log_err(msg: str):
+    console.print(f"[red]{msg}[/red]")
+
+
+registry_app = typer.Typer(no_args_is_help=True)
+app.add_typer(registry_app, name="registry")
 
 
 def _count_tools_and_servers(tools_description: str) -> tuple[int, int]:
@@ -236,6 +249,59 @@ def main(
             )
 
         asyncio.run(_init())
+
+
+@registry_app.command("add-mcp")
+def registry_add_mcp(
+    registry: str = typer.Option(..., "--registry", "-r"),
+    name: str = typer.Option(..., "--name", "-n"),
+    transport: str = typer.Option(..., "--transport", "-t"),
+    description: str | None = typer.Option(None, "--desc"),
+    url: str | None = typer.Option(None, "--url"),
+    headers: str | None = typer.Option(None, "--headers"),
+    cmd: str | None = typer.Option(None, "--cmd"),
+    args: str | None = typer.Option(None, "--args"),
+    cwd: str | None = typer.Option(None, "--cwd"),
+    env: str | None = typer.Option(None, "--env"),
+    framing: str = typer.Option("jsonl", "--framing"),
+):
+    http_config = None
+    stdio_config = None
+
+    try:
+        http_config, stdio_config = reg_lib.parse_transport_config(
+            transport, url, headers, cmd, args, cwd, env, framing
+        )
+        reg_lib.add_mcp(
+            registry_path=registry,
+            name=name,
+            transport=transport,
+            description=description,
+            http=http_config,
+            stdio=stdio_config,
+        )
+        log_success(f"Added MCP {name}")
+    except ValueError as e:
+        log_err(str(e))
+        raise typer.Exit(1)
+
+
+@registry_app.command("remove-mcp")
+def registry_rm_mcp(
+    registry: str = typer.Option(..., "--registry", "-r"),
+    names: list[str] = typer.Argument(...),
+):
+    try:
+        removed, missing = reg_lib.remove_mcp(registry, names)
+
+        if removed:
+            log_success(f"Successfully removed: {', '.join(removed)}")
+        if missing:
+            log_err(f"Services not found: {', '.join(missing)}")
+
+    except Exception as e:
+        log_err(f"Failed to remove services: {e}")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
