@@ -20,6 +20,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Setting this variable for limiting the number of times the planning LLM gets called,
+# if it fails to give model in a specific format and to make sure tool suggestions are correct
+MAX_RETRIES = 5
+
 class CoordinationService:
     """Coordination service for planning."""
 
@@ -33,7 +37,7 @@ class CoordinationService:
     def _to_dict(self, obj: Any) -> Dict[str, Any]:
         """
         Normalize SubPrompt into a real dict.
-        When the prompt goes to the LLM, it returns a Pydantic model, 
+        When the prompt goes to the LLM, it returns a Pydantic parsed model, 
         which makes it difficult to process for python, instead to make 
         it more generalized have added this middleware to make any kind of 
         data that comes in, return as a dict for simplicity purposes. 
@@ -84,8 +88,8 @@ class CoordinationService:
         if(not(False in tool_check)):
             return Plan.model_validate_json(plan_json)
         else:
-            # Keeping the retry count to a maximum of 5
-            if(self.retryCount<=5):
+            # Keeping the retry count to MAX_RETRIES
+            if(self.retryCount<=MAX_RETRIES):
                 self.retryCount+=1
                 logger.warning(f"Retrying Planning LLM due to invalid tool suggestion!")
                 await self.handle_prompt(user_input)
