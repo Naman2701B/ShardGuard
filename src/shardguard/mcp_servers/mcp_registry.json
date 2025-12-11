@@ -1,0 +1,50 @@
+{
+  "mcps": {
+    "file-operations": {
+      "transport": "stdio",
+      "description": "File operations with security controls",
+      "stdio": {
+        "cmd": "python",
+        "args": [
+          "src/shardguard/mcp_servers/file_server.py"
+        ]
+      },
+      "tools": {
+        "allow": [
+          "*"
+        ]
+      }
+    },
+    "database-operations": {
+      "transport": "stdio",
+      "description": "Database operations with security controls",
+      "stdio": {
+        "cmd": "python",
+        "args": [
+          "src/shardguard/mcp_servers/database_server.py"
+        ]
+      },
+      "tools": {
+        "allow": [
+          "*"
+        ]
+      }
+    },
+    "web-operations": {
+      "transport": "stdio",
+      "description": "Web operations with security controls",
+      "stdio": {
+        "cmd": "python",
+        "args": [
+          "-m",
+          "shardguard.mcp_servers.web_server"
+        ]
+      },
+      "tools": {
+        "allow": [
+          "*"
+        ]
+      }
+    }
+  }
+}
