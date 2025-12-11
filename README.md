@@ -124,7 +124,7 @@ shardguard plan "Your prompt" --provider gemini --gemini-api-key "your-key"
 
 ```bash
 # Install dependencies
-poetry install
+poetry install -E dev
 
 # Install pre-commit hooks (required for each developer)
 poetry run pre-commit install
