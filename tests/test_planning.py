@@ -1,5 +1,7 @@
 """Tests for ShardGuard planning functionality."""
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -111,7 +113,6 @@ class TestPlanningLLMConstructor:
 
     def test_planning_llm_ollama_constructor(self):
         """Test creating Ollama planning LLM."""
-        from shardguard.core.planning import PlanningLLM
 
         llm = PlanningLLM(
             provider_type="ollama", model="llama3.1", base_url="http://custom:8080"
@@ -123,7 +124,6 @@ class TestPlanningLLMConstructor:
 
     def test_planning_llm_gemini_constructor(self):
         """Test creating Gemini planning LLM."""
-        from shardguard.core.planning import PlanningLLM
 
         llm = PlanningLLM(
             provider_type="gemini", model="gemini-1.5-pro", api_key="test-key"
@@ -132,3 +132,44 @@ class TestPlanningLLMConstructor:
         assert llm.provider_type == "gemini"
         assert llm.model == "gemini-1.5-pro"
         assert llm.api_key == "test-key"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_get_available_tools_description_with_local_mcp(tmp_path):
+    registry_path = tmp_path / "mcp_registry.json"
+
+    repo_root = Path(__file__).resolve().parents[1]
+    file_mcp = repo_root / "src/shardguard/mcp_servers/file_server.py"
+    assert file_mcp.exists()
+
+    registry_path.write_text(
+        json.dumps(
+            {
+                "mcps": {
+                    "mcp-name": {
+                        "transport": "stdio",
+                        "stdio": {
+                            "cmd": "python",
+                            "args": [str(file_mcp)],
+                            "cwd": str(repo_root),
+                            "framing": "jsonl",
+                        },
+                        "tools": {"allow": ["*"], "deny": []},
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    planning_obj = PlanningLLM.__new__(PlanningLLM)
+    planning_obj.registry_path = str(tmp_path / "mcp_registry.json")
+
+    out = await planning_obj.get_available_tools_description()
+
+    assert "MCP_SERVER: mcp-name" in out
+    assert "TOOL_KEY:" in out
+    # Testing tools in file_server.py
+    assert "write_file" in out
+    assert "read_file" in out

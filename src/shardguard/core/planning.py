@@ -1,12 +1,16 @@
 """Planning LLM with MCP integration and multiple provider support."""
 
+import asyncio
 import json
 import logging
 import re
-from typing import Protocol
+from pathlib import Path
+from typing import Any, Protocol
+
+from shardguard.core.mcp_client import PROJECT_ROOT
+from shardguard.mcp_servers import registry
 
 from .llm_providers import LLMProviderFactory
-from .mcp_integration import MCPClient
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +31,23 @@ class PlanningLLM:
         base_url: str = "http://localhost:11434",
         api_key: str | None = None,
     ):
+        root = Path(PROJECT_ROOT).resolve()
+        if root.name == "core":
+            root = root.parent.parent
+        elif root.name == "shardguard":
+            root = root.parent
+        elif root.name == "src":
+            root = root.parent
+
+        self.registry_path = str(
+            root / "src" / "shardguard" / "mcp_servers" / "mcp_registry.json"
+        )
+
         """Initialize with MCP client integration and configurable LLM provider."""
         self.provider_type = provider_type
         self.model = model
         self.base_url = base_url
         self.api_key = api_key
-        self.mcp_client = MCPClient()
 
         # Create the appropriate LLM provider
         provider_kwargs = {}
@@ -47,13 +62,12 @@ class PlanningLLM:
 
     async def generate_plan(self, prompt: str) -> str:
         """Generate a plan using the configured LLM provider."""
-        tools_description = await self.mcp_client.get_tools_description()
+        tools_description = await self.get_available_tools_description()
 
         # Create enhanced prompt with tools
         enhanced_prompt = (
-            f"{prompt}\n\n{tools_description}"
-            if tools_description != "No MCP tools available."
-            else prompt
+            f"### Available MCP Servers & Tools ###\n{tools_description}\n\n"
+            f"### User Request ###\n{prompt}"
         )
 
         logger.debug("Full prompt sent to model:\n%s", enhanced_prompt)
@@ -67,7 +81,53 @@ class PlanningLLM:
 
     async def get_available_tools_description(self) -> str:
         """Get formatted description of all available MCP tools."""
-        return await self.mcp_client.get_tools_description()
+        registry._CLIENTS.clear()
+        tools_map = await asyncio.to_thread(
+            registry.fetch_all_tools, self.registry_path
+        )
+
+        try:
+            reg_data = await asyncio.to_thread(
+                registry.load_registry, self.registry_path
+            )
+            mcps: dict[str, dict[str, Any]] = reg_data.get("mcps", {})
+
+            if not mcps:
+                logger.warning(f"No mcps found in registry at {self.registry_path}")
+                return "No MCP Servers registered."
+
+            tools_map: dict[str, list[dict[str, Any]]] = await asyncio.to_thread(
+                registry.fetch_all_tools, self.registry_path
+            )
+
+            lines: list[str] = []
+            for server_name in mcps.keys():
+                lines.append(f"MCP_SERVER: {server_name}")
+
+                server_tools = tools_map.get(server_name) or []
+                if not server_tools:
+                    lines.append("  (Status: Offline or No Tools Found)\n")
+                    continue
+
+                for tool in server_tools:
+                    t_name = tool.get("name") or ""
+                    t_desc = tool.get("description") or "No description provided."
+                    lines.append(f"  - TOOL_KEY: {t_name}")
+                    lines.append(f"    TOOL_DESCRIPTION: {t_desc}")
+
+                    schema = tool.get("inputSchema")
+                    if schema:
+                        lines.append(
+                            f"    TOOL_SCHEMA: {json.dumps(schema, sort_keys=True)}"
+                        )
+
+                lines.append("")  # spacer
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.error(f"Failed to fetch tools: {e}")
+            return f"Error loading tools from registry: {e}"
 
     def _extract_json_from_response(self, response: str) -> str:
         """Extract JSON from LLM response that might contain extra text."""
