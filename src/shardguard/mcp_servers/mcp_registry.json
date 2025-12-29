@@ -6,7 +6,9 @@
       "stdio": {
         "cmd": "python",
         "args": [
-          "src/shardguard/mcp_servers/file_server.py"
+          [
+            "src/shardguard/mcp_servers/file_server.py"
+          ]
         ]
       },
       "tools": {
@@ -21,7 +23,9 @@
       "stdio": {
         "cmd": "python",
         "args": [
-          "src/shardguard/mcp_servers/database_server.py"
+          [
+            "src/shardguard/mcp_servers/database_server.py"
+          ]
         ]
       },
       "tools": {

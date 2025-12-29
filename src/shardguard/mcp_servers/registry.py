@@ -8,6 +8,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from shardguard.core.mcp_client import MCPClient
+
 REG_MCP_KEY = "mcps"
 
 DEFAULT_HTTP_HEADERS = {
@@ -54,40 +56,22 @@ def add_mcp(
     reg = load_registry(registry_path)
     mcps = reg[REG_MCP_KEY]
 
-    tnorm = (transport or "").strip().lower()
-    if tnorm in {"http", "streaming-http", "stream-http", "streamablehttp"}:
-        tnorm = "streamable-http"
+    tnorm = _normalize_transport(transport)
     if tnorm not in {"streamable-http", "stdio"}:
         raise ValueError("transport must be one of: streamable-http, stdio")
 
-    entry: dict[str, Any] = {"transport": tnorm}
-
+    entry: dict[str, Any] = {
+        "transport": tnorm,
+        "tools": DEFAULT_TOOLS_CONFIG.copy(),
+    }
     if description:
         entry["description"] = description
 
     if tnorm == "streamable-http":
-        if not http or not isinstance(http, dict) or not http.get("url"):
-            raise ValueError("http.url is required for streamable-http")
-
-        user_headers = http.get("headers") or {}
-        combined_headers = DEFAULT_HTTP_HEADERS.copy()
-        combined_headers.update(user_headers)
-
-        entry["http"] = {
-            "url": str(http["url"]).rstrip("/"),
-            "headers": combined_headers,
-        }
+        entry["http"] = _build_http_entry(http)
     else:
-        if not stdio or not isinstance(stdio, dict) or not stdio.get("cmd"):
-            raise ValueError("stdio.cmd is required for stdio")
-        entry["stdio"] = {
-            "cmd": stdio["cmd"],
-            **({"args": stdio.get("args")} if stdio.get("args") else {}),
-            **({"cwd": stdio.get("cwd")} if stdio.get("cwd") else {}),
-            **({"env": stdio.get("env")} if stdio.get("env") else {}),
-            "framing": (stdio.get("framing") or "jsonl").lower(),
-        }
-    entry["tools"] = DEFAULT_TOOLS_CONFIG.copy()
+        entry["stdio"] = _build_stdio_entry(stdio)
+
     mcps[name] = entry
     _atomic_write(registry_path, reg)
     return reg
@@ -160,3 +144,151 @@ def parse_transport_config(
         stdio_config["env"] = parsed_env
 
     return None, stdio_config
+
+
+def _normalize_transport(transport: str) -> str:
+    t = (transport or "").strip().lower()
+    if t in {"http", "streaming-http", "stream-http", "streamablehttp"}:
+        return "streamable-http"
+    return t
+
+
+def _build_http_entry(http: dict[str, Any] | None) -> dict[str, Any]:
+    if not http or not isinstance(http, dict) or not http.get("url"):
+        raise ValueError("http.url is required for streamable-http")
+
+    user_headers = http.get("headers") or {}
+    combined_headers = DEFAULT_HTTP_HEADERS.copy()
+    combined_headers.update(user_headers)
+
+    return {
+        "url": str(http["url"]).rstrip("/"),
+        "headers": combined_headers,
+    }
+
+
+def _coerce_args_list(raw_args: Any) -> list[str] | None:
+    if raw_args is None:
+        return None
+    if isinstance(raw_args, list):
+        return raw_args
+    if isinstance(raw_args, str):
+        return [raw_args]
+    raise ValueError("stdio.args has a parsing error.")
+
+
+def _build_stdio_entry(stdio: dict[str, Any] | None) -> dict[str, Any]:
+    if not stdio or not isinstance(stdio, dict) or not stdio.get("cmd"):
+        raise ValueError("stdio.cmd is required for stdio")
+
+    args_list = _coerce_args_list(stdio.get("args"))
+
+    entry_stdio: dict[str, Any] = {
+        "cmd": stdio["cmd"],
+        "framing": (stdio.get("framing") or "jsonl").lower(),
+    }
+    if args_list:
+        entry_stdio["args"] = args_list
+    if stdio.get("cwd"):
+        entry_stdio["cwd"] = stdio["cwd"]
+    if stdio.get("env"):
+        entry_stdio["env"] = stdio["env"]
+
+    return entry_stdio
+
+
+def _build_client_from_entry(name: str, cfg: dict[str, Any]) -> MCPClient:
+    transport = (cfg.get("transport") or "").strip().lower()
+    if transport in {"http", "streaming-http", "stream-http", "streamablehttp"}:
+        transport = "streamable-http"
+
+    if transport == "streamable-http":
+        http = cfg.get("http") or {}
+        url = str(http.get("url") or "").rstrip("/")
+        headers = http.get("headers") or {}
+        if not url:
+            raise ValueError(f"{name!r}: http.url missing")
+        return MCPClient(
+            "streamable-http",
+            http_url=url,
+            http_headers=headers,
+            session_id=f"sg-{name}",
+        )
+
+    if transport == "stdio":
+        std = cfg.get("stdio") or {}
+        cmd = std.get("cmd")
+        if not cmd:
+            raise ValueError(f"{name!r}: stdio.cmd missing")
+        return MCPClient(
+            "stdio",
+            stdio_cmd=cmd,
+            stdio_args=std.get("args") or [],
+            stdio_cwd=std.get("cwd"),
+            stdio_env=std.get("env") or {},
+            session_id=f"sg-{name}",
+            stdio_framing=(std.get("framing") or "jsonl").lower(),
+        )
+
+    raise ValueError(f"{name!r}: unsupported or missing transport")
+
+
+_CLIENTS: dict[str, MCPClient] = {}
+
+
+def get_or_create_client(registry_path: str, name: str) -> MCPClient:
+    if name in _CLIENTS:
+        return _CLIENTS[name]
+
+    reg = load_registry(registry_path)
+    mcps = reg.get(REG_MCP_KEY, {})
+    cfg = mcps.get(name)
+    if not cfg:
+        raise KeyError(f"MCP {name!r} not found in registry")
+
+    client = _build_client_from_entry(name, cfg)
+    _CLIENTS[name] = client
+    return client
+
+
+def fetch_tools(
+    registry_path: str,
+    name: str,
+    *,
+    init: bool = True,
+    timeout: float = 15.0,
+) -> list[dict[str, Any]]:
+    client = get_or_create_client(registry_path, name)
+
+    if init:
+        client.initialize(timeout=timeout)
+
+    return client.tools_list(timeout=timeout)
+
+
+def fetch_all_tools(
+    registry_path: str,
+    *,
+    init: bool = True,
+    timeout: float = 15.0,
+) -> dict[str, list[dict[str, Any]]]:
+    reg = load_registry(registry_path)
+    mcps = reg.get(REG_MCP_KEY, {})
+
+    out: dict[str, list[dict[str, Any]]] = {}
+    for name in mcps.keys():
+        try:
+            out[name] = fetch_tools(registry_path, name, init=init, timeout=timeout)
+        except Exception:
+            out[name] = []
+    return out
+
+
+def clear_client_cache() -> None:
+    global _CLIENTS  # noqa: PLW0602
+    for c in _CLIENTS.values():
+        try:
+            c.close()
+        except Exception:
+            pass
+    _CLIENTS.clear()
