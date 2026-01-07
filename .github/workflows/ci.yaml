@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff black flake8 pylint bandit trufflehog==2.2.1 pytest pytest-cov
+          pip install ruff black flake8 pylint bandit trufflehog==2.2.1 pytest pytest-cov poetry pre-commit
           poetry install
           poetry run pre-commit install
 
