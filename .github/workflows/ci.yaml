@@ -1,0 +1,79 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  ci:
+    name: Run CI Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------
+      #  Checkout repository
+      # -------------------------
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # -------------------------
+      #  Set up Python
+      # -------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # -------------------------
+      # Install dependencies
+      # -------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black flake8 pylint bandit trufflehog==2.2.1 pytest pytest-cov
+          poetry install
+          poetry run pre-commit install
+
+      # -------------------------
+      # Code Formatting Check
+      # -------------------------
+      - name: Run black
+        run: |
+          black . -l 78
+
+      # -------------------------
+      # Lint Checks
+      # -------------------------
+      - name: Run ruff lint
+        run: |
+          ruff check .
+
+      - name: Run flake8
+        run: |
+          flake8 --exclude venv,.venv,env,build,dist,__pycache__,.git
+
+      - name: Run pylint
+        run: |
+          pylint shardguard || true
+
+      # -------------------------
+      # SAST Scanning (Bandit)
+      # -------------------------
+      - name: Run Bandit security scan
+        run: |
+          bandit -r . -ll
+
+      # -------------------------
+      # Secret Scanning (TruffleHog)
+      # -------------------------
+      - name: Run TruffleHog
+        run: |
+          trufflehog filesystem --repo_path . || true
+
+      # -------------------------
+      # Testing & Coverage
+      # -------------------------
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=. || true
