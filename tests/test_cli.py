@@ -6,7 +6,12 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from shardguard.cli import app, create_planner
+from shardguard.cli import (
+    _get_model_for_provider,
+    _validate_gemini_api_key,
+    app,
+    create_planner,
+)
 
 
 class TestCreatePlanner:
@@ -71,7 +76,7 @@ class TestCLICommands:
     def test_list_tools_command_ollama(self):
         """Test list-tools command with Ollama provider."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
-            mock_context_manager, mock_planner = self._create_mock_planner_context(
+            mock_context_manager, _mock_planner = self._create_mock_planner_context(
                 "Available MCP Tools:\n\nServer: file-server\n• read-file\n• write-file"
             )
             mock_create_planner.return_value = mock_context_manager
@@ -88,7 +93,7 @@ class TestCLICommands:
             with patch(
                 "shardguard.cli._print_verbose_tools_info"
             ) as mock_verbose_print:
-                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                mock_context_manager, _mock_planner = self._create_mock_planner_context(
                     "Available MCP Tools:\n\nServer: file-server"
                 )
                 mock_create_planner.return_value = mock_context_manager
@@ -102,7 +107,7 @@ class TestCLICommands:
         """Test list-tools command with Gemini provider."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
             with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}):
-                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                mock_context_manager, _mock_planner = self._create_mock_planner_context(
                     "Available MCP Tools:\n\nServer: gemini-server"
                 )
                 mock_create_planner.return_value = mock_context_manager
@@ -130,7 +135,7 @@ class TestCLICommands:
         """Test plan command successful execution."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
             with patch("shardguard.cli.CoordinationService") as mock_coord_service:
-                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                mock_context_manager, _mock_planner = self._create_mock_planner_context(
                     "Available MCP Tools:\n\nServer: file-server"
                 )
                 mock_create_planner.return_value = mock_context_manager
@@ -164,7 +169,7 @@ class TestCLICommands:
             with patch(
                 "shardguard.cli._print_verbose_tools_info"
             ) as mock_verbose_print:
-                mock_context_manager, mock_planner = self._create_mock_planner_context(
+                mock_context_manager, _mock_planner = self._create_mock_planner_context(
                     "Available MCP Tools:\n\nServer: file-server"
                 )
                 mock_create_planner.return_value = mock_context_manager
@@ -178,7 +183,7 @@ class TestCLICommands:
     def test_main_callback_without_verbose(self):
         """Test main callback without verbose flag."""
         with patch("shardguard.cli.create_planner") as mock_create_planner:
-            mock_context_manager, mock_planner = self._create_mock_planner_context(
+            mock_context_manager, _mock_planner = self._create_mock_planner_context(
                 "Available MCP Tools:\n\nServer: file-server"
             )
             mock_create_planner.return_value = mock_context_manager
@@ -195,42 +200,36 @@ class TestHelperFunctions:
 
     def test_validate_gemini_api_key_valid(self):
         """Test Gemini API key validation with valid key."""
-        from shardguard.cli import _validate_gemini_api_key
 
         # Should not raise exception
         _validate_gemini_api_key("gemini", "valid-key")
 
     def test_validate_gemini_api_key_missing(self):
         """Test Gemini API key validation with missing key."""
-        from shardguard.cli import _validate_gemini_api_key
 
         with pytest.raises(typer.Exit):
             _validate_gemini_api_key("gemini", None)
 
     def test_validate_gemini_api_key_not_gemini(self):
         """Test Gemini API key validation with non-Gemini provider."""
-        from shardguard.cli import _validate_gemini_api_key
 
         # Should not raise exception for non-Gemini providers
         _validate_gemini_api_key("ollama", None)
 
     def test_get_model_for_provider_explicit(self):
         """Test model selection with explicit model."""
-        from shardguard.cli import _get_model_for_provider
 
         result = _get_model_for_provider("ollama", "custom-model")
         assert result == "custom-model"
 
     def test_get_model_for_provider_auto_detect_gemini(self):
         """Test model auto-detection for Gemini."""
-        from shardguard.cli import _get_model_for_provider
 
         result = _get_model_for_provider("gemini", None)
         assert result == "gemini-2.0-flash-exp"
 
     def test_get_model_for_provider_auto_detect_ollama(self):
         """Test model auto-detection for Ollama."""
-        from shardguard.cli import _get_model_for_provider
 
         result = _get_model_for_provider("ollama", None)
         assert result == "llama3.2"
