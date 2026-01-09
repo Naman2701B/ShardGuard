@@ -1,6 +1,6 @@
 """Tests for ShardGuard coordination functionality."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -131,7 +131,6 @@ class TestCoordinationService:
     @pytest.mark.asyncio
     async def test_handle_prompt_planning_called_with_formatted_prompt(self):
         """Test that planner receives properly formatted prompt with user input."""
-        from unittest.mock import AsyncMock
 
         mock_planner = Mock()
         mock_planner.generate_plan = AsyncMock(

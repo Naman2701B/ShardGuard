@@ -5,6 +5,9 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
+import google.generativeai as genai
+import httpx
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +44,6 @@ class OllamaProvider(LLMProvider):
     def _init_client(self):
         """Initialize the HTTP client."""
         try:
-            import httpx
 
             self.client = httpx.Client(timeout=300.0)
         except ImportError:
@@ -146,7 +148,6 @@ class GeminiProvider(LLMProvider):
             return
 
         try:
-            import google.generativeai as genai
 
             genai.configure(api_key=self.api_key)
             self.client = genai.GenerativeModel(self.model)

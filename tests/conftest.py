@@ -1,5 +1,7 @@
 """Test configuration and fixtures for ShardGuard tests."""
 
+import os
+
 import pytest
 from rich.console import Console
 
@@ -8,7 +10,6 @@ from rich.console import Console
 def mock_console():
     """Provide a mock console that doesn't output to stdout/stderr."""
     # Create a console that writes to /dev/null to avoid test output pollution
-    import os
 
     null_file = open(os.devnull, "w")
     return Console(file=null_file, stderr=False)

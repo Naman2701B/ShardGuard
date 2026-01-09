@@ -1,6 +1,7 @@
 """MCP client integration for ShardGuard using the official Python SDK."""
 
 import logging
+import os
 import sys
 from typing import Any
 
@@ -15,7 +16,6 @@ class MCPClient:
 
     def __init__(self):
         """Initialize the MCP client."""
-        import os
 
         # Get the absolute path to the servers directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
